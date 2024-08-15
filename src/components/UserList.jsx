@@ -5,8 +5,12 @@ import { useAuth } from '../contexts/AuthContext';
 
 // eslint-disable-next-line react/prop-types
 const UserList = ({ onSelectUser }) => {
-  const { user } = useAuth(); // Get the logged-in user's info
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
+
+  const handleUserClick = (userId, userName) => {
+    onSelectUser({ id: userId, name: userName });
+  };
 
   useEffect(() => {
     const usersRef = collection(firestore, 'users');
@@ -22,14 +26,12 @@ const UserList = ({ onSelectUser }) => {
     return () => unsubscribe();
   }, []);
 
- 
   const otherUsers = users.filter(u => u.id !== user?.uid);
   const loggedInUser = users.find(u => u.id === user?.uid);
 
   return (
-    <div className="p-4 border-r border-gray-300 bg-white h-full">
+    <div className="w-full h-full overflow-y-auto">
       <h2 className="text-lg font-semibold mb-4">Users</h2>
-
       {loggedInUser && (
         <div className="mb-6">
           <h3 className="text-md font-semibold mb-2">You:</h3>
@@ -47,11 +49,10 @@ const UserList = ({ onSelectUser }) => {
           <li className="text-gray-500">No other users online</li>
         ) : (
           otherUsers.map(user => (
-            
-            <li 
-              key={user.id} 
+            <li
+              key={user.id}
               className="flex items-center p-2 bg-gray-100 rounded-lg cursor-pointer"
-              onClick={() => onSelectUser(user.id)}
+              onClick={() => handleUserClick(user.id, user.name)}
             >
               <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold mr-3">
                 {user.name.charAt(0)}

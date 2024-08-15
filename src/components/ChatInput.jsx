@@ -8,7 +8,6 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 const ChatInput = ({ recipientId }) => {
   const [message, setMessage] = useState('');
   const { user } = useAuth();
-
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -17,7 +16,7 @@ const ChatInput = ({ recipientId }) => {
     e.preventDefault();
 
     if (!message.trim()) {
-      alert('Message cannot be empty');
+      // alert('Message cannot be empty');
       return;
     }
 
@@ -41,28 +40,31 @@ const ChatInput = ({ recipientId }) => {
 
   const toggleRecording = async () => {
     if (isRecording) {
-      // Stop the recording
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     } else {
-      // Start the recording
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorderRef.current = new MediaRecorder(stream);
+        const mimeType = 'audio/webm;codecs=opus';  // You can try different formats like 'audio/ogg'
         
-        mediaRecorderRef.current.ondatavailable = (event) => {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
+        } else {
+          alert('Desired audio format is not supported by your browser.');
+          return;
+        }
+        
+        mediaRecorderRef.current.ondataavailable = (event) => {
           audioChunksRef.current.push(event.data);
         };
-
+  
         mediaRecorderRef.current.onstop = async () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
           audioChunksRef.current = [];
-
-          // Save the audio message to Firebase
           const chatId = [user.uid, recipientId].sort().join('_');
           await saveVoiceMessage(audioBlob, chatId, user.uid);
         };
-
+  
         mediaRecorderRef.current.start();
         setIsRecording(true);
       } else {
@@ -70,19 +72,31 @@ const ChatInput = ({ recipientId }) => {
       }
     }
   };
+  
 
   const saveVoiceMessage = async (audioBlob, chatId, userId) => {
     const storage = getStorage();
     const storageRef = ref(storage, `voiceMessages/${Date.now()}.webm`);
 
-    await uploadBytes(storageRef, audioBlob);
-    const downloadURL = await getDownloadURL(storageRef);
+    try {
+      // Upload the file
+      const snapshot = await uploadBytes(storageRef, audioBlob, {
+        contentType: 'audio/webm', // Ensure the correct MIME type
+      });
 
-    await addDoc(collection(firestore, 'chats', chatId, 'messages'), {
-      senderId: userId,
-      audioUrl: downloadURL,
-      timestamp: serverTimestamp(),
-    });
+      // Get the download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      console.log('Download URL:', downloadURL);
+
+      // Save the message in Firestore
+      await addDoc(collection(firestore, 'chats', chatId, 'messages'), {
+        senderId: userId,
+        audioUrl: downloadURL,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error uploading audio:', error);
+    }
   };
 
   return (
@@ -93,17 +107,17 @@ const ChatInput = ({ recipientId }) => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Type a message..."
-          className="flex-1 p-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={toggleRecording}
-          className="p-2 bg-blue-500 text-white rounded-full"
+          className="p-2 bg-blue-500 ml-4 text-white rounded-lg"
         >
           {isRecording ? 'Stop 🛑' : 'Start 🎤'}
         </button>
         <button
           type="submit"
-          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="ml-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           Send
         </button>

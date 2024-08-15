@@ -4,7 +4,7 @@ import { firestore } from '../firebase/firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
 
 // eslint-disable-next-line react/prop-types
-const ChatWindow = ({ recipientId }) => {
+const ChatWindow = ({ recipientId, recipientName }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
 
@@ -28,6 +28,9 @@ const ChatWindow = ({ recipientId }) => {
 
   return (
     <div className="p-4 bg-gray-50 h-full flex flex-col">
+      <div className="p-2 text-lg font-semibold border-b border-gray-300">
+        {recipientName || 'Unknown'}
+      </div>
       <div className="flex-1 overflow-y-auto">
         {messages.map((message) => (
           <div

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 import { firestore } from '../firebase/firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
+import { v4 as uuidv4 } from 'uuid'; // Import UUID for generating unique IDs
 
 // eslint-disable-next-line react/prop-types
-const CreateGroup = ({ onGroupCreated }) => {
+const CreateGroup = ({ onGroupCreated, onClose }) => {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [groupName, setGroupName] = useState('');
@@ -35,6 +36,8 @@ const CreateGroup = ({ onGroupCreated }) => {
     if (!groupName.trim() || selectedUsers.length === 0) return;
 
     try {
+      const groupId = uuidv4(); // Generate unique ID for the group
+
       const groupData = {
         name: groupName,
         members: [user.uid, ...selectedUsers],
@@ -42,10 +45,14 @@ const CreateGroup = ({ onGroupCreated }) => {
         createdAt: new Date(),
       };
 
-      await addDoc(collection(firestore, 'groups'), groupData);
-      onGroupCreated();
+      await addDoc(collection(firestore, 'groups'), { id: groupId, ...groupData }); // Add group with unique ID
+
+      // Optionally, you could notify users or update their group list here
+
+      if (onGroupCreated) onGroupCreated(); // Callback after successful group creation
       setGroupName('');
       setSelectedUsers([]);
+      if (onClose) onClose(); // Close the modal if onClose prop is provided
     } catch (error) {
       console.error('Error creating group: ', error);
     }
@@ -79,12 +86,20 @@ const CreateGroup = ({ onGroupCreated }) => {
             </li>
           ))}
       </ul>
-      <button
-        onClick={handleCreateGroup}
-        className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-      >
-        Create Group
-      </button>
+      <div className="flex justify-end">
+        <button
+          onClick={handleCreateGroup}
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+        >
+          Create Group
+        </button>
+        <button
+          onClick={onClose}
+          className="ml-2 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 };

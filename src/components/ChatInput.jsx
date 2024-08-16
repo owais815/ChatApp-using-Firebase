@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // eslint-disable-next-line react/prop-types
-const ChatInput = ({ recipientId }) => {
+const ChatInput = ({ recipientId, isGroup }) => {
   const [message, setMessage] = useState('');
   const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
@@ -15,14 +15,11 @@ const ChatInput = ({ recipientId }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!message.trim()) {
-      // alert('Message cannot be empty');
-      return;
-    }
+    if (!message.trim()) return;
 
     try {
-      const chatId = [user.uid, recipientId].sort().join('_');
-      const ref = collection(firestore, 'chats', chatId, 'messages');
+      const chatId = isGroup ? recipientId : [user.uid, recipientId].sort().join('_');
+      const ref = collection(firestore, isGroup ? 'groups' : 'chats', chatId, 'messages');
 
       await addDoc(ref, {
         text: message,
@@ -45,7 +42,7 @@ const ChatInput = ({ recipientId }) => {
     } else {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mimeType = 'audio/webm;codecs=opus';  // You can try different formats like 'audio/ogg'
+        const mimeType = 'audio/webm;codecs=opus';
         
         if (MediaRecorder.isTypeSupported(mimeType)) {
           mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
@@ -61,7 +58,7 @@ const ChatInput = ({ recipientId }) => {
         mediaRecorderRef.current.onstop = async () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
           audioChunksRef.current = [];
-          const chatId = [user.uid, recipientId].sort().join('_');
+          const chatId = isGroup ? recipientId : [user.uid, recipientId].sort().join('_');
           await saveVoiceMessage(audioBlob, chatId, user.uid);
         };
   
@@ -72,24 +69,20 @@ const ChatInput = ({ recipientId }) => {
       }
     }
   };
-  
 
   const saveVoiceMessage = async (audioBlob, chatId, userId) => {
     const storage = getStorage();
     const storageRef = ref(storage, `voiceMessages/${Date.now()}.webm`);
 
     try {
-      // Upload the file
       const snapshot = await uploadBytes(storageRef, audioBlob, {
-        contentType: 'audio/webm', // Ensure the correct MIME type
+        contentType: 'audio/webm',
       });
 
-      // Get the download URL
       const downloadURL = await getDownloadURL(snapshot.ref);
       console.log('Download URL:', downloadURL);
 
-      // Save the message in Firestore
-      await addDoc(collection(firestore, 'chats', chatId, 'messages'), {
+      await addDoc(collection(firestore, isGroup ? 'groups' : 'chats', chatId, 'messages'), {
         senderId: userId,
         audioUrl: downloadURL,
         timestamp: serverTimestamp(),
@@ -127,7 +120,3 @@ const ChatInput = ({ recipientId }) => {
 };
 
 export default ChatInput;
-
-
-
-
